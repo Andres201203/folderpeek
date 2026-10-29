@@ -10,6 +10,7 @@ let minSpacing: CGFloat = 92   // straight-line distance between neighboring ite
 let itemMargin: CGFloat = 44   // half an item; centers keep this far from the edges
 let maxFiles = 7
 let haloPadding: CGFloat = 58
+let maxSingleRadius: CGFloat = 210  // grow one arc up to this before using a second ring
 
 struct RingSlot {
   let center: CGPoint
@@ -85,10 +86,22 @@ func computeRingLayout(center: CGPoint, bounds: CGRect, totalFiles: Int) -> Ring
     return RingLayout(slots: [], haloRadius: innerRadius - 20, fileCount: 0, showsMore: false)
   }
   let safe = bounds.insetBy(dx: itemMargin, dy: itemMargin)
+  let needed = min(totalFiles, maxFiles) + (totalFiles > maxFiles ? 1 : 0)
+
+  // One clean arc reads best: widen it until every slot fits.
+  for r in stride(from: innerRadius, through: maxSingleRadius, by: 4) {
+    let ring = Ring(radius: r, arc: largestArc(center: center, radius: r, safe: safe))
+    if ring.capacity >= needed {
+      let slots = ring.points(needed, center: center).map { RingSlot(center: $0, ring: 0) }
+      return RingLayout(slots: slots, haloRadius: r + haloPadding,
+                        fileCount: min(totalFiles, maxFiles), showsMore: totalFiles > maxFiles)
+    }
+  }
+
+  // Tight spots (corners): two rings.
   let inner = Ring(radius: innerRadius, arc: largestArc(center: center, radius: innerRadius, safe: safe))
   let outer = Ring(radius: outerRadius, arc: largestArc(center: center, radius: outerRadius, safe: safe))
 
-  let needed = min(totalFiles, maxFiles) + (totalFiles > maxFiles ? 1 : 0)
   let onInner = min(needed, inner.capacity)
   let onOuter = min(needed - onInner, outer.capacity)
   let slotCount = onInner + onOuter

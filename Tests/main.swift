@@ -48,6 +48,9 @@ do { // topEdge8
   check(l.slots.allSatisfy { safe.contains($0.center) }, "edge inside bounds")
   check(l.slots.allSatisfy { $0.center.y <= c.y + 8 }, "edge opens downward")
   check(l.fileCount == 7 && l.showsMore, "edge 7 + more (got \(l.fileCount), \(l.showsMore))")
+  check(l.slots.allSatisfy { $0.ring == 0 }, "edge uses a single arc")
+  let radii = l.slots.map { dist($0.center, c) }
+  check(radii.max()! - radii.min()! < 1, "edge arc has one radius")
   check(pairwiseOK(l.slots), "edge spacing")
 }
 do { // empty
