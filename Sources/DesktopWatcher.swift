@@ -17,6 +17,9 @@ final class DesktopWatcher {
   /// `point` and the returned icon frame are in AppKit screen coordinates.
   func folder(at point: CGPoint) -> (url: URL, iconFrame: CGRect)? {
     let h = primaryScreenHeight
+    // Finder answers AX hit-tests for Desktop icons even when a full-screen
+    // app owns the screen, so first make sure the Desktop is what you see.
+    guard desktopIsVisible(at: point) else { return nil }
     var hit: AXUIElement?
     guard AXUIElementCopyElementAtPosition(system, Float(point.x), Float(h - point.y), &hit) == .success,
           let el = hit else { return nil }
@@ -32,6 +35,27 @@ final class DesktopWatcher {
 
     // AX frames use a top-left origin on the primary screen.
     return (folder, CGRect(x: frame.minX, y: h - frame.maxY, width: frame.width, height: frame.height))
+  }
+
+  /// Whether the Desktop itself is what's showing at `point` (AppKit screen
+  /// coordinates) on the current Space: Finder's Desktop window is on screen
+  /// there and no app window covers it.
+  func desktopIsVisible(at point: CGPoint) -> Bool {
+    let p = CGPoint(x: point.x, y: primaryScreenHeight - point.y)
+    guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else { return false }
+    let me = ProcessInfo.processInfo.processIdentifier
+    let desktopLevel = Int(CGWindowLevelForKey(.desktopIconWindow))
+    let dockLevel = Int(CGWindowLevelForKey(.dockWindow))
+    for w in windows {  // front to back
+      guard let dict = w[kCGWindowBounds as String] as? NSDictionary,
+            let bounds = CGRect(dictionaryRepresentation: dict), bounds.contains(p),
+            let pid = w[kCGWindowOwnerPID as String] as? pid_t, pid != me,
+            (w[kCGWindowAlpha as String] as? Double ?? 1) > 0 else { continue }
+      let layer = w[kCGWindowLayer as String] as? Int ?? 0
+      if layer == desktopLevel { return NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == "com.apple.finder" }
+      if layer >= 0 && layer < dockLevel { return false }
+    }
+    return false
   }
 
   private var primaryScreenHeight: CGFloat { NSScreen.screens.first?.frame.height ?? 0 }

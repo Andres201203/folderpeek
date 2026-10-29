@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, QLPreviewPanelDataSour
   private var lastHit: (url: URL, iconFrame: CGRect)?
   private var candidate: (url: URL, since: Date)?
   private var outsideSince: Date?
+  private var tickCount = 0
 
   private var spaceTap: CFMachPort?
   private var previewURL: URL?
@@ -76,6 +77,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, QLPreviewPanelDataSour
     let now = Date()
 
     ring.updateHover(at: p)
+    // Twice a second, make sure the folder is still on screen (not covered by
+    // a window or a full-screen app); otherwise the ring has no business here.
+    tickCount += 1
+    if ring.isOpen && !ring.isDragging && tickCount % 15 == 0 {
+      let icon = ring.iconFrame
+      if !watcher.desktopIsVisible(at: CGPoint(x: icon.midX, y: icon.midY)) { dismiss(); return }
+    }
     if ring.isOpen {
       if ring.contains(p) || ring.isDragging {
         outsideSince = nil
