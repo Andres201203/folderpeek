@@ -14,7 +14,7 @@ Success: hover over a Desktop folder, see its files, then open or drag one out w
 ## Goals
 
 - Hover over a folder icon on the Desktop. After a short pause, its files fan out around the icon in a frosted-glass **ring**.
-- **Newest files first.** Up to 7 files sit on the ring. If there are more, the last slot becomes a `+N` bubble. Clicking it opens a scrollable grid of every file in the same glass style, anchored to the ring.
+- **Newest files first.** Up to 9 files sit snug around the icon on a honeycomb (two rows when needed; chosen by Andres 2026-10-28 over a single wide arc). If there are more, the last slot becomes a `+N` bubble. Clicking it opens a scrollable grid of every file in the same glass style, anchored to the ring.
 - **The ring adapts to the screen edges** (approved mockup `ring-corner.html`): a full ring in open space, a half ring against one edge, a quarter ring in a corner, always opening toward the middle of the screen. It never goes under the menu bar, under the Dock, or off-screen.
 - The glass behind the ring blurs whatever sits under it, neighboring folders included. *(Claude's call: the mockup showed other icons fading, but Finder draws those icons and FolderPeek can't dim them without a full-screen overlay. The blur gives the same effect natively, so no separate fade.)*
 - Actions on a file in the ring or grid:

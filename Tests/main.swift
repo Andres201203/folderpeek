@@ -19,17 +19,22 @@ func pairwiseOK(_ s: [RingSlot]) -> Bool {
 let screen = CGRect(x: 0, y: 0, width: 1470, height: 900)
 let safe = screen.insetBy(dx: itemMargin, dy: itemMargin)
 
-do { // openSpace5
-  let l = computeRingLayout(center: CGPoint(x: 700, y: 450), bounds: screen, totalFiles: 5)
-  check(l.slots.count == 5, "openSpace5 count \(l.slots.count)")
-  check(l.slots.allSatisfy { $0.ring == 0 }, "openSpace5 inner ring only")
-  check(!l.showsMore, "openSpace5 no more bubble")
+func maxDist(_ l: RingLayout, _ c: CGPoint) -> CGFloat { l.slots.map { dist($0.center, c) }.max() ?? 0 }
+let snug = minSpacing * 2 + 1   // second row of the honeycomb
+
+do { // openSpace5: one snug row around the icon
+  let c = CGPoint(x: 700, y: 450)
+  let l = computeRingLayout(center: c, bounds: screen, totalFiles: 5)
+  check(l.slots.count == 5 && !l.showsMore, "openSpace5 count \(l.slots.count)")
+  check(maxDist(l, c) <= minSpacing + 1, "openSpace5 all touching the icon")
   check(pairwiseOK(l.slots), "openSpace5 spacing")
 }
 do { // openSpace30
-  let l = computeRingLayout(center: CGPoint(x: 700, y: 450), bounds: screen, totalFiles: 30)
-  check(l.slots.count == 8, "openSpace30 count \(l.slots.count)")
-  check(l.fileCount == 7 && l.showsMore, "openSpace30 7 files + more")
+  let c = CGPoint(x: 700, y: 450)
+  let l = computeRingLayout(center: c, bounds: screen, totalFiles: 30)
+  check(l.slots.count == 10, "openSpace30 count \(l.slots.count)")
+  check(l.fileCount == 9 && l.showsMore, "openSpace30 9 files + more")
+  check(maxDist(l, c) <= snug, "openSpace30 snug")
   check(pairwiseOK(l.slots), "openSpace30 spacing")
 }
 do { // topRightCorner30
@@ -39,18 +44,17 @@ do { // topRightCorner30
   let mx = l.slots.map(\.center.x).reduce(0,+) / CGFloat(l.slots.count), my = l.slots.map(\.center.y).reduce(0,+) / CGFloat(l.slots.count)
   check(mx < c.x - 60 && my < c.y - 60, "corner opens down-left")
   check(l.showsMore && l.fileCount + 1 == l.slots.count, "corner more bubble")
-  check(l.slots.count >= 6, "corner count \(l.slots.count)")
+  check(l.slots.count == 10, "corner count \(l.slots.count)")
   check(pairwiseOK(l.slots), "corner spacing")
 }
-do { // topEdge8
-  let c = CGPoint(x: 735, y: 850)
-  let l = computeRingLayout(center: c, bounds: screen, totalFiles: 8)
+do { // topEdge9: OPT, all 9 files and no gap
+  let c = CGPoint(x: 1173, y: 850)
+  let l = computeRingLayout(center: c, bounds: screen, totalFiles: 9)
   check(l.slots.allSatisfy { safe.contains($0.center) }, "edge inside bounds")
   check(l.slots.allSatisfy { $0.center.y <= c.y + 8 }, "edge opens downward")
-  check(l.fileCount == 7 && l.showsMore, "edge 7 + more (got \(l.fileCount), \(l.showsMore))")
-  check(l.slots.allSatisfy { $0.ring == 0 }, "edge uses a single arc")
-  let radii = l.slots.map { dist($0.center, c) }
-  check(radii.max()! - radii.min()! < 1, "edge arc has one radius")
+  check(l.fileCount == 9 && !l.showsMore, "edge all 9 files (got \(l.fileCount), \(l.showsMore))")
+  check(maxDist(l, c) <= snug, "edge snug (\(maxDist(l, c)))")
+  check(l.slots.filter { dist($0.center, c) <= minSpacing + 1 }.count >= 4, "edge first row hugs the icon")
   check(pairwiseOK(l.slots), "edge spacing")
 }
 do { // empty

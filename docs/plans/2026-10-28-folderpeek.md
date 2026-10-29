@@ -16,7 +16,7 @@
 - Fully local: no networking APIs anywhere.
 - `LSUIElement` true, bundle id `com.andres.folderpeek`, app `FolderPeek.app`, executable `FolderPeek`.
 - Signed with a stable local identity `FolderPeek Local` (created once by `build.sh`), never ad-hoc.
-- Max 7 files on the ring. With more, the last slot is a `+N` bubble (N = total − files shown).
+- Max 9 files on the ring (was 7; changed after UAT). With more, the last slot is a `+N` bubble (N = total − files shown).
 - Newest first, by `contentModificationDate`. Skip hidden files and `.DS_Store`.
 - The ring never extends outside `NSScreen.visibleFrame` (no menu bar, no Dock, no off-screen).
 - Only `~/Desktop` items trigger the ring. Directories and aliases/symlinks to directories trigger it; packages do not.
