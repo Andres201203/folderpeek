@@ -6,7 +6,12 @@ import ApplicationServices
 // folder hidden behind a window is never reported.
 
 final class DesktopWatcher {
-  private let system = AXUIElementCreateSystemWide()
+  private let system: AXUIElement = {
+    // A hung app under the pointer must not stall us (default timeout is ~6 s).
+    let e = AXUIElementCreateSystemWide()
+    AXUIElementSetMessagingTimeout(e, 0.15)
+    return e
+  }()
   private let desktop = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop")
 
   /// `point` and the returned icon frame are in AppKit screen coordinates.

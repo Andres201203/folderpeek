@@ -266,8 +266,10 @@ final class RingPanel: NSObject, NSDraggingSource {
     draggedURL = nil
     // A drop into Finder on the same disk moves the file; refresh so the ring
     // never shows a file that is gone.
-    if let dragged, !FileManager.default.fileExists(atPath: dragged.path), let folder, isOpen {
-      show(folder: folder, iconFrame: iconFrame, animated: false)
+    guard let dragged, !FileManager.default.fileExists(atPath: dragged.path), let folder, isOpen else { return }
+    switch mode {
+    case .ring: show(folder: folder, iconFrame: iconFrame, animated: false)
+    case .grid: showGrid(readFolder(folder))
     }
   }
 }

@@ -20,9 +20,10 @@ fi
 
 # A stable self-signed identity keeps the Accessibility grant across rebuilds
 # (ad-hoc signatures change every build and macOS forgets the grant).
-if ! security find-certificate -c "$IDENTITY" >/dev/null 2>&1; then
+if ! security find-identity -p codesigning | command grep -q "\"$IDENTITY\""; then
   echo "Creating local signing identity \"$IDENTITY\" (one time)…"
   TMP=$(mktemp -d)
+  trap 'rm -rf "$TMP"' EXIT   # never leave the private key behind
   cat > "$TMP/cert.cnf" <<CNF
 [req]
 distinguished_name = dn
@@ -41,7 +42,6 @@ CNF
     -out "$TMP/id.p12" -passout pass:folderpeek 2>/dev/null
   security import "$TMP/id.p12" -k "$HOME/Library/Keychains/login.keychain-db" \
     -P folderpeek -T /usr/bin/codesign >/dev/null
-  rm -r "$TMP"
 fi
 
 mkdir -p "$APP/Contents/MacOS"
@@ -76,7 +76,7 @@ if [[ "${1:-}" == "--install" ]]; then
   <key>ProcessType</key><string>Interactive</string>
 </dict></plist>
 PLIST
-  launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+  launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null && sleep 1 || true
   launchctl bootstrap "gui/$(id -u)" "$AGENT"
   echo "Running, and set to start at login."
 fi

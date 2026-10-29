@@ -23,6 +23,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, QLPreviewPanelDataSour
 
   private var spaceTap: CFMachPort?
   private var previewURL: URL?
+  fileprivate var swallowingSpace = false
+  private let focusProbe: AXUIElement = {
+    let e = AXUIElementCreateSystemWide()
+    AXUIElementSetMessagingTimeout(e, 0.1)
+    return e
+  }()
 
   func applicationDidFinishLaunching(_ note: Notification) {
     let prompt = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
@@ -30,9 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, QLPreviewPanelDataSour
       start()
       return
     }
-    // Not trusted yet, or a stale grant from an older build: send the user to
-    // the right Settings pane and wait.
-    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+    // Not trusted yet (the system prompt above offers to open Settings), or a
+    // stale grant from an older build: wait until it's granted.
     permissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] t in
       if AXIsProcessTrusted() { t.invalidate(); self?.start() }
     }
@@ -45,6 +50,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, QLPreviewPanelDataSour
     center.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] note in
       let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
       if app?.processIdentifier != ProcessInfo.processInfo.processIdentifier { self?.dismiss() }
+    }
+    // A preview left open while you switch away would keep catching Space.
+    NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+      guard let self, self.previewURL != nil else { return }
+      QLPreviewPanel.shared()?.orderOut(nil)
+      self.previewURL = nil
     }
     center.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
       self?.dismiss()
@@ -100,7 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, QLPreviewPanelDataSour
   // MARK: Space → Quick Look
 
   private func installSpaceTap() {
-    let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
+    let mask = CGEventMask(1 << CGEventType.keyDown.rawValue) | CGEventMask(1 << CGEventType.keyUp.rawValue)
     let me = Unmanaged.passUnretained(self).toOpaque()
     guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
                                       eventsOfInterest: mask, callback: spaceTapCallback, userInfo: me) else {
@@ -119,23 +130,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, QLPreviewPanelDataSour
   /// Returns true when the Space press was ours and must not reach Finder.
   fileprivate func handleSpace() -> Bool {
     let panel = QLPreviewPanel.shared()!
-    if panel.isVisible && previewURL != nil && !ring.isOpen {
+    // Our preview is in front: Space closes it, like Finder.
+    if panel.isVisible && previewURL != nil && NSApp.isActive && panel.isKeyWindow {
       panel.orderOut(nil)
       previewURL = nil
       return true
     }
-    guard ring.isOpen, let entry = ring.hoveredEntry else { return false }
-    if panel.isVisible && previewURL == entry.url {
-      panel.orderOut(nil)
-      previewURL = nil
-      return true
-    }
+    guard ring.isOpen, let entry = ring.hoveredEntry, !isTyping() else { return false }
     previewURL = entry.url
     NSApp.activate()
     panel.dataSource = self
     panel.reloadData()
     panel.makeKeyAndOrderFront(nil)
     return true
+  }
+
+  /// Whether the keyboard focus is a text field or terminal, where Space must
+  /// always type a space.
+  private func isTyping() -> Bool {
+    var focused: AnyObject?
+    guard AXUIElementCopyAttributeValue(focusProbe, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
+          let el = focused else { return false }
+    var role: AnyObject?
+    AXUIElementCopyAttributeValue(el as! AXUIElement, kAXRoleAttribute as CFString, &role)
+    let textRoles: Set<String> = [kAXTextFieldRole, kAXTextAreaRole, kAXComboBoxRole, "AXSearchField", "AXWebArea"]
+    return textRoles.contains(role as? String ?? "")
   }
 
   func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int { previewURL == nil ? 0 : 1 }
@@ -153,11 +172,18 @@ private func spaceTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: 
     delegate.reenableTap()
     return Unmanaged.passUnretained(event)
   }
+  guard event.getIntegerValueField(.keyboardEventKeycode) == spaceKeyCode else { return Unmanaged.passUnretained(event) }
+  // Once a press is ours, its repeats and its key-up are ours too, so Finder
+  // never sees half of it.
+  if delegate.swallowingSpace {
+    if type == .keyUp { delegate.swallowingSpace = false }
+    return nil
+  }
   if type == .keyDown,
-     event.getIntegerValueField(.keyboardEventKeycode) == spaceKeyCode,
      event.getIntegerValueField(.keyboardEventAutorepeat) == 0,
      event.flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift]).isEmpty,
      delegate.handleSpace() {
+    delegate.swallowingSpace = true
     return nil
   }
   return Unmanaged.passUnretained(event)
