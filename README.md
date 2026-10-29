@@ -3,6 +3,8 @@
 Hover over a folder on the Desktop and its files fan out around it in a
 Liquid Glass honeycomb. Fully local; macOS 26.
 
+![FolderPeek showing a folder's files around it](docs/img/folderpeek.png)
+
 - **Click** a file to open it. Click the folder in the middle to open it in Finder.
 - **Drag** a file into a browser, Mail, the terminal, or Finder.
 - **Space** over a file previews it (Quick Look). Never while you're typing.
