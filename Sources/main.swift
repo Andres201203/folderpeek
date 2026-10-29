@@ -40,7 +40,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, QLPreviewPanelDataSour
 
   private func start() {
     installSpaceTap()
+    // Switching apps (click, Cmd-Tab) or desktops means you've moved on: close.
+    let center = NSWorkspace.shared.notificationCenter
+    center.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] note in
+      let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+      if app?.processIdentifier != ProcessInfo.processInfo.processIdentifier { self?.dismiss() }
+    }
+    center.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+      self?.dismiss()
+    }
     timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in self?.tick() }
+  }
+
+  private func dismiss() {
+    candidate = nil
+    outsideSince = nil
+    if ring.isOpen && !ring.isDragging { ring.close(animated: false) }
   }
 
   // MARK: Pointer loop

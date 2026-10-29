@@ -203,7 +203,8 @@ final class RingPanel: NSObject, NSDraggingSource {
       p.hasShadow = false
       p.hidesOnDeactivate = false
       p.becomesKeyOnlyIfNeeded = true
-      p.collectionBehavior = [.canJoinAllSpaces, .transient, .ignoresCycle]
+      // Belongs to the Space it opened on, so switching desktops leaves it behind.
+      p.collectionBehavior = [.transient, .ignoresCycle]
       self.panel = p
       return p
     }()
